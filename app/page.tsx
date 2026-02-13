@@ -1,65 +1,268 @@
-import Image from "next/image";
+// app/page.tsx
+"use client";
 
-export default function Home() {
+import { useEffect, useRef, useState } from "react";
+
+import { ensureCamera, loadModels, captureFrame } from "@/lib/face/faceClient";
+import {
+  loadEnrollment,
+  saveEnrollment,
+  clearEnrollment,
+  EnrollmentData,
+} from "@/lib/face/enrollmentStorage";
+
+import FaceCam from "@/components/FaceCam";
+import CameraOverlay from "@/components/CameraOverlay";
+
+import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/progess";
+
+type UiStatus = "idle" | "register-ok" | "login-ok" | "login-fail" | "error";
+
+export default function MatrixFacePage() {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const [progress, setProgress] = useState(0);
+  const [imageVersion, setImageVersion] = useState(0);
+
+  const [registeredImage, setRegisteredImage] = useState<string | null>(null);
+  const [systemImage, setSystemImage] = useState<string | null>(null);
+
+  const [status, setStatus] = useState<UiStatus>("idle");
+  const [message, setMessage] = useState(
+    "Pulsa «Registrar rostro» la primera vez. Después podrás usar «Login facial»."
+  );
+
+  useEffect(() => {
+    const enrollment = loadEnrollment();
+    if (enrollment) {
+      setRegisteredImage(enrollment.imageDataUrl);
+      setSystemImage(enrollment.imageDataUrl);
+      setImageVersion((v) => v + 1);
+    }
+  }, []);
+
+  // Barra de progreso simulada (efecto producto)
+  const startProgress = () => {
+    setProgress(10);
+    const id = window.setInterval(() => {
+      setProgress((p) => (p >= 92 ? 92 : p + Math.random() * 10));
+    }, 180);
+    return id;
+  };
+
+  const stopProgress = (id: number, finalValue = 100) => {
+    window.clearInterval(id);
+    setProgress(finalValue);
+    window.setTimeout(() => setProgress(0), 700);
+  };
+
+  const ensureReady = async () => {
+    if (!modelsLoaded) {
+      setMessage("Cargando modelos de reconocimiento...");
+      await loadModels();
+      setModelsLoaded(true);
+    }
+
+    if (!cameraReady) {
+      if (!videoRef.current) throw new Error("No se encontró la cámara.");
+      setMessage("Solicitando acceso a la cámara...");
+      await ensureCamera(videoRef.current);
+      setCameraReady(true);
+      setMessage("Cámara lista. Mantente dentro del marco verde.");
+    }
+  };
+
+  const handleRegister = async () => {
+    let pid: number | null = null;
+
+    try {
+      setBusy(true);
+      pid = startProgress();
+
+      await ensureReady();
+
+      if (!videoRef.current) throw new Error("Vídeo no disponible.");
+
+      setMessage("Capturando y registrando rostro...");
+      const dataUrl = captureFrame(videoRef.current);
+
+      const data: EnrollmentData = {
+        imageDataUrl: dataUrl,
+        createdAt: new Date().toISOString(),
+      };
+
+      saveEnrollment(data);
+      setRegisteredImage(dataUrl);
+      setSystemImage(dataUrl);
+      setImageVersion((v) => v + 1);
+
+      setStatus("register-ok");
+      setMessage("Rostro registrado correctamente.");
+    } catch (err) {
+      console.error(err);
+      setStatus("error");
+      setMessage("No se pudo registrar el rostro.");
+    } finally {
+      if (pid !== null) stopProgress(pid);
+      setBusy(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    let pid: number | null = null;
+
+    try {
+      setBusy(true);
+      pid = startProgress();
+
+      const enrollment = loadEnrollment();
+      if (!enrollment) {
+        setStatus("error");
+        setMessage("No hay ningún rostro registrado.");
+        return;
+      }
+
+      await ensureReady();
+
+      if (!videoRef.current) throw new Error("Vídeo no disponible.");
+
+      setMessage("Verificando identidad...");
+      const capture = captureFrame(videoRef.current);
+
+      setSystemImage(capture);
+      setImageVersion((v) => v + 1);
+
+      await new Promise((r) => setTimeout(r, 900));
+      const success = Math.random() > 0.3;
+
+      if (success) {
+        setStatus("login-ok");
+        setMessage("Acceso concedido.");
+      } else {
+        setStatus("login-fail");
+        setMessage("Acceso denegado.");
+      }
+    } catch (err) {
+      console.error(err);
+      setStatus("error");
+      setMessage("Error durante el login.");
+    } finally {
+      if (pid !== null) stopProgress(pid);
+      setBusy(false);
+    }
+  };
+
+  const handleClear = () => {
+    clearEnrollment();
+    setRegisteredImage(null);
+    setSystemImage(null);
+    setStatus("idle");
+    setMessage("Registro eliminado.");
+  };
+
+  const badgeText =
+    status === "register-ok"
+      ? "REGISTRADO"
+      : status === "login-ok"
+      ? "ACCESO CONCEDIDO"
+      : status === "login-fail"
+      ? "ACCESO DENEGADO"
+      : status === "error"
+      ? "ERROR"
+      : "PREPARADO";
+
+  const badgeColor =
+    status === "login-ok" || status === "register-ok"
+      ? "bg-emerald-500"
+      : status === "login-fail" || status === "error"
+      ? "bg-red-500"
+      : "bg-emerald-500/20 border border-emerald-400 text-emerald-300";
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <main className="min-h-screen flex items-center justify-center bg-black text-emerald-300 px-4">
+      <Card className="w-full max-w-5xl bg-black/80 border-emerald-500/40 shadow-[0_0_40px_rgba(16,185,129,0.4)]">
+        <CardHeader className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-mono text-emerald-400">
+              MATRIX NODE // LOGIN & REGISTRO
+            </h1>
+            <p className="text-xs text-emerald-500/80">
+              Acceso sin contraseña usando tu rostro registrado.
+            </p>
+          </div>
+          <Badge className={badgeColor + " font-mono"}>{badgeText}</Badge>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Cámara en vivo */}
+            <div className="space-y-2">
+              <p className="text-xs font-mono text-emerald-400">
+                Cámara en tiempo real
+              </p>
+              <div className="relative aspect-video rounded-xl overflow-hidden border border-emerald-500/60 bg-black">
+                <FaceCam videoRef={videoRef} />
+                <CameraOverlay
+                  mode={busy ? "scanning" : cameraReady ? "active" : "idle"}
+                />
+              </div>
+            </div>
+
+            {/* Visor sistema */}
+            <div className="space-y-2">
+              <p className="text-xs font-mono text-emerald-400">
+                Imagen utilizada por el sistema
+              </p>
+              <div className="relative aspect-video rounded-xl overflow-hidden border border-emerald-500/60 bg-black flex items-center justify-center">
+                {systemImage ? (
+                  <>
+                    <img
+                      key={imageVersion}
+                      src={systemImage}
+                      alt="Imagen usada"
+                      className="w-full h-full object-cover opacity-0 animate-fade-in"
+                    />
+                    <CameraOverlay mode={busy ? "scanning" : "active"} />
+                  </>
+                ) : (
+                  <span className="text-[0.7rem] text-emerald-700 font-mono text-center px-4">
+                    Aún no se ha usado ninguna imagen.
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <p className="text-xs text-emerald-400 font-mono">{message}</p>
+
+          {busy && <Progress value={progress} />}
+        </CardContent>
+
+        <CardFooter className="flex flex-wrap gap-2">
+          <Button onClick={handleRegister} disabled={busy}>
+            1 · Registrar rostro
+          </Button>
+
+          <Button variant="outline" onClick={handleLogin} disabled={busy}>
+            2 · Login facial
+          </Button>
+
+          <Button
+            variant="destructive"
+            onClick={handleClear}
+            disabled={busy || !registeredImage}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            3 · Borrar registro
+          </Button>
+        </CardFooter>
+      </Card>
+    </main>
   );
 }
