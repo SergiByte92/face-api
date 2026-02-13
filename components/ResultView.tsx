@@ -1,6 +1,6 @@
 "use client";
 
-import { IdentifyStatus } from "@/app/page";
+import type { IdentifyStatus } from "@/lib/face/faceTypes";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
