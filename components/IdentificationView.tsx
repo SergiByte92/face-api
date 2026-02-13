@@ -62,6 +62,12 @@ export default function IdentificationView({ onFinished }: Props) {
     }
   };
 
+  const overlayMode = busy
+    ? "scanning"
+    : phase === "cameraReady" || phase === "verified" || phase === "notVerified"
+    ? "active"
+    : "idle";
+
   const badge = {
     idle: "Esperando",
     loadingModels: "Cargando",
@@ -86,7 +92,7 @@ export default function IdentificationView({ onFinished }: Props) {
 
           <div className="relative aspect-video bg-black rounded-xl overflow-hidden">
             <FaceCam videoRef={videoRef} />
-            <CameraOverlay phase={phase} />
+            <CameraOverlay mode={overlayMode} />
           </div>
 
           {phase === "loadingModels" && <Progress value={40} />}
