@@ -1,5 +1,5 @@
 "use client";
-
+// arreglado
 import { useRef, useState, useEffect } from "react";
 import { ensureCamera, loadModels, captureFrame } from "@/lib/face/faceClient";
 import {
@@ -12,12 +12,7 @@ import {
 import FaceCam from "@/components/FaceCam";
 import CameraOverlay from "@/components/CameraOverlay";
 
-import {
-  Card,
-  CardHeader,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
+import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -36,11 +31,17 @@ export default function RegisterPage() {
   }, []);
 
   const handleLoadModels = async () => {
-    setLoadingModels(true);
-    setMessage("Cargando modelos Matrix...");
-    await loadModels();
-    setLoadingModels(false);
-    setMessage("Modelos listos. Ahora activa la cámara.");
+    try {
+      setLoadingModels(true);
+      setMessage("Cargando modelos Matrix...");
+      await loadModels();
+      setMessage("Modelos listos. Ahora activa la cámara.");
+    } catch (err) {
+      console.error(err);
+      setMessage("Error cargando modelos. Revisa la consola.");
+    } finally {
+      setLoadingModels(false);
+    }
   };
 
   const handleStartCamera = async () => {
@@ -48,10 +49,16 @@ export default function RegisterPage() {
       setMessage("No se ha encontrado la cámara.");
       return;
     }
-    setMessage("Solicitando acceso a la cámara...");
-    await ensureCamera(videoRef.current);
-    setCameraReady(true);
-    setMessage("Cámara activa. Asegúrate de estar centrado en el marco verde.");
+
+    try {
+      setMessage("Solicitando acceso a la cámara...");
+      await ensureCamera(videoRef.current);
+      setCameraReady(true);
+      setMessage("Cámara activa. Asegúrate de estar centrado en el marco verde.");
+    } catch (err) {
+      console.error(err);
+      setMessage("No se pudo acceder a la cámara. Revisa permisos del navegador.");
+    }
   };
 
   const handleCaptureAndRegister = () => {
@@ -66,6 +73,7 @@ export default function RegisterPage() {
         imageDataUrl: dataUrl,
         createdAt: new Date().toISOString(),
       };
+
       saveEnrollment(data);
       setEnrollment(data);
       setMessage("Rostro capturado y registrado correctamente.");
@@ -81,6 +89,13 @@ export default function RegisterPage() {
     setMessage("Registro facial eliminado.");
   };
 
+  // ✅ OverlayMode correcto: "idle" | "active" | "scanning"
+  const overlayMode = loadingModels
+    ? "scanning"
+    : cameraReady
+    ? "active"
+    : "idle";
+
   return (
     <main className="min-h-screen flex items-center justify-center bg-black text-emerald-300 px-4">
       <Card className="w-full max-w-5xl bg-black/80 border-emerald-500/40 shadow-[0_0_40px_rgba(16,185,129,0.4)]">
@@ -93,6 +108,7 @@ export default function RegisterPage() {
               Paso 1: registrar tu rostro como “contraseña visual”.
             </p>
           </div>
+
           <Badge className="bg-emerald-500/20 border border-emerald-400 text-emerald-300 font-mono">
             {enrollment ? "REGISTRO ACTIVO" : "SIN REGISTRO"}
           </Badge>
@@ -103,9 +119,7 @@ export default function RegisterPage() {
           <div className="space-y-4">
             <div className="relative aspect-video rounded-xl overflow-hidden border border-emerald-500/60 bg-black">
               <FaceCam videoRef={videoRef} />
-              <CameraOverlay
-                phase={cameraReady ? "cameraReady" : "cameraPermission"}
-              />
+              <CameraOverlay mode={overlayMode} />
             </div>
 
             <p className="text-xs text-emerald-400 font-mono">{message}</p>
@@ -135,7 +149,7 @@ export default function RegisterPage() {
                 variant="outline"
                 className="border-emerald-500 text-emerald-300 hover:bg-emerald-500/10 font-mono"
                 onClick={handleCaptureAndRegister}
-                disabled={!cameraReady}
+                disabled={!cameraReady || loadingModels}
               >
                 3 · Capturar y registrar
               </Button>
@@ -148,17 +162,17 @@ export default function RegisterPage() {
               Registro almacenado
             </h2>
 
-            <div className="relative aspect-video rounded-xl border border-emerald-500/40 bg-black/80 flex items-center justify-center">
+            <div className="relative aspect-video rounded-xl border border-emerald-500/40 bg-black/80 flex items-center justify-center overflow-hidden">
               {enrollment?.imageDataUrl ? (
                 <img
                   src={enrollment.imageDataUrl}
                   alt="Registro facial"
-                  className="w-full h-full object-cover rounded-xl"
+                  className="w-full h-full object-cover"
                 />
               ) : (
                 <span className="text-xs text-emerald-600 font-mono text-center px-4">
-                  Todavía no has registrado tu rostro. Captura y registra una
-                  vez y quedará guardado en este dispositivo.
+                  Todavía no has registrado tu rostro. Captura y registra una vez
+                  y quedará guardado en este dispositivo.
                 </span>
               )}
             </div>
