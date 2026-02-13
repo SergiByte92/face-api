@@ -12,3 +12,5 @@ export interface DetectResult {
   verified: boolean;
   confidence: number;
 }
+
+export type IdentifyStatus = "ok" | "fail" | "error";

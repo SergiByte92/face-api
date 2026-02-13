@@ -1,4 +1,3 @@
-// app/page.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -48,7 +47,6 @@ export default function MatrixFacePage() {
     }
   }, []);
 
-  // Barra de progreso simulada (efecto producto)
   const startProgress = () => {
     setProgress(10);
     const id = window.setInterval(() => {
@@ -202,7 +200,6 @@ export default function MatrixFacePage() {
 
         <CardContent className="space-y-4">
           <div className="grid md:grid-cols-2 gap-6">
-            {/* Cámara en vivo */}
             <div className="space-y-2">
               <p className="text-xs font-mono text-emerald-400">
                 Cámara en tiempo real
@@ -215,7 +212,6 @@ export default function MatrixFacePage() {
               </div>
             </div>
 
-            {/* Visor sistema */}
             <div className="space-y-2">
               <p className="text-xs font-mono text-emerald-400">
                 Imagen utilizada por el sistema

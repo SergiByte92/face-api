@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { IdentifyStatus } from "@/app/page";
+import type { IdentifyStatus } from "@/lib/face/faceTypes";
 import { FacePhase } from "@/lib/face/faceTypes";
 import { loadModels, ensureCamera, detectAndVerify } from "@/lib/face/faceClient";
 
